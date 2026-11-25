@@ -1068,6 +1068,8 @@ $('#esSel').onchange=ev=>{ S.cur=ev.target.value; S.calM=null; try{localStorage.
 route();
 boot();
 </script>
-<script>if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));}</script>
+<script>if("serviceWorker" in navigator){ const had=!!navigator.serviceWorker.controller; let ok=false;
+  navigator.serviceWorker.addEventListener("controllerchange",()=>{ if(had && !ok && !document.querySelector("#sheet:not([hidden])")){ ok=true; location.reload(); } });
+  window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js",{updateViaCache:"none"}).then(r=>{ document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible") r.update().catch(()=>{}); }); }).catch(()=>{})); }</script>
 </body>
 </html>
