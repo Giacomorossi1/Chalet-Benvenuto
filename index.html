@@ -830,6 +830,7 @@ function openForm(m, tipo, preset){
     if(dep) d.piano='Comune';
     const pianoOpts = ent ? [['PT','Piano Terra'],['PB','Piano Balconi'],['Comune','Tutta la casa']] : pre ? [['PT','Piano Terra'],['PB','Piano Balconi']] : [['Comune','Comune'],['PT','Piano Terra'],['PB','Piano Balconi']];
     const title = ent?(isNew?'Nuova prenotazione':'Prenotazione'):pre?'Prelievo / dividendo':dep?'Caparra da restituire':(isNew?'Nuova spesa':'Spesa');
+    const sc0=sh.scrollTop, sc1=sh.firstElementChild?sh.firstElementChild.scrollTop:0;
     sh.innerHTML = `<div class="panel" role="dialog" aria-modal="true" aria-labelledby="fTitle">
       <div class="sectionhead"><h2 id="fTitle" style="font-size:1.2rem">${title}</h2><button class="btn small" id="fClose">Chiudi</button></div>
       ${ent && !isNew && residuo(m)>0 ? `<div class="banner num"><b>L'ospite deve ancora ${eur(daOspite(m))}</b>${extra(m)?`: ${eur(residuo(m))} di incasso + ${eur(extra(m))} di pulizie e lenzuola`:''}<br>Totale ${eur(r2(+m.importo+extra(m)))}${+m.caparra?` · caparra versata ${eur(Math.min(+m.importo,+m.caparra))}`:''}<br><button class="btn small primary" id="fPaid" style="margin-top:8px">Segna saldo incassato</button></div>`:''}
@@ -840,7 +841,7 @@ function openForm(m, tipo, preset){
         <div class="field"><span>Date del soggiorno</span><div class="rp" id="rp"></div>
           <input id="f-data" type="hidden" value="${esc(d.data)}"><input id="f-fine" type="hidden" value="${esc(d.dataFine)}"></div>
         <div class="grid2"><label class="toggle" style="align-self:center"><input id="f-hcani" type="checkbox" ${d.haCani?'checked':''}> Ospiti con cani</label>
-          ${d.haCani?`<label class="field" style="margin:0"><span>Quanti cani</span><select id="f-cani">${[1,2,3,4,5].map(n=>`<option value="${n}"${n===(d.cani||1)?' selected':''}>${n}</option>`).join('')}</select></label>`:'<span></span>'}</div>
+          <label class="field" id="f-caniBox" style="margin:0"${d.haCani?'':' hidden'}><span>Quanti cani</span><select id="f-cani">${[1,2,3,4,5].map(n=>`<option value="${n}"${n===(d.cani||1)?' selected':''}>${n}</option>`).join('')}</select></label></div>
         <div class="grid2"><label class="field"><span>Prezzo totale €</span><input id="f-imp" class="amount" type="number" inputmode="decimal" step="0.01" value="${d.tot===''?'':d.tot}" placeholder="0"></label><span></span></div>
         <p class="info num" id="fInfo"></p>
         <div class="grid2"><label class="field"><span>Caparra già versata €</span><input id="f-cap" type="number" inputmode="decimal" step="0.01" value="${d.caparra===''||d.caparra===null||d.caparra===undefined?'':d.caparra}" placeholder="0"></label>
@@ -895,10 +896,11 @@ function openForm(m, tipo, preset){
           $('#f-data').value=d.data; $('#f-fine').value=d.dataFine; rp(); info(); });
       };
       rp(); swipe($('#rp'), ()=>$('#rpNext').click(), ()=>$('#rpPrev').click());
-      $('#f-hcani').onchange=()=>{ grab(); if(d.haCani && !d.cani) d.cani=1; draw(); };
+      $('#f-hcani').onchange=()=>{ $('#f-caniBox').hidden=!$('#f-hcani').checked; grab(); };
       $('#f-imp').oninput=info; $('#f-cap').oninput=info; $('#f-sal').onchange=info; if($('#f-ppul')) $('#f-ppul').onchange=info;
       info();
     }
+    sh.scrollTop=sc0; if(sh.firstElementChild) sh.firstElementChild.scrollTop=sc1;
     $('#fClose').onclick=close;
     const fp=$('#fPaid'); if(fp) fp.onclick=async()=>{ fp.disabled=true; try{ await S.db.doc('movimenti/'+m.id).update({saldato:true, aggiornato:new Date().toISOString()}); close(); toast('Saldo segnato come incassato'); }catch(x){ fp.disabled=false; toast('Non salvato: '+errMsg(x)); } };
     $('#fSave').onclick=async()=>{
