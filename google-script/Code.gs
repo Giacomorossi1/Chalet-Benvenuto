@@ -22,6 +22,20 @@ const COLONNE = {
 const DATE = ['data','dataFine','inizio','dataFondoCassa','dataCassaReale','pulizieDal'];
 const TESTO = ['id','tipo','piano','canale','categoria','descrizione','note','esercizio','aggiornato','valore'];
 
+// Le colonne vere sono quelle scritte nella riga 1 di ogni scheda. Se l'app manda un campo nuovo
+// (es. "cani"), la colonna viene aggiunta da sola: non serve rifare il deployment per i campi nuovi.
+function colonne(sh, nome) {
+  const last = Math.max(1, sh.getLastColumn());
+  let head = sh.getRange(1, 1, 1, last).getValues()[0].map(String).filter(c => c !== '');
+  const manca = COLONNE[nome].filter(c => head.indexOf(c) < 0);
+  if (manca.length) { aggiungiColonne(sh, head, manca); head = head.concat(manca); }
+  return head;
+}
+function aggiungiColonne(sh, head, nuove) {
+  if (sh.getMaxColumns() < head.length + nuove.length) sh.insertColumnsAfter(sh.getMaxColumns(), head.length + nuove.length - sh.getMaxColumns());
+  sh.getRange(1, head.length + 1, 1, nuove.length).setValues([nuove]).setFontWeight('bold').setBackground('#EFE6D5');
+}
+
 function prepara() {
   const ss = SpreadsheetApp.getActive();
   Object.keys(COLONNE).forEach(nome => {
@@ -71,7 +85,7 @@ function foglio(nome) {
 }
 
 function leggi(nome) {
-  const sh = foglio(nome), cols = COLONNE[nome], n = sh.getLastRow() - 1;
+  const sh = foglio(nome), cols = colonne(sh, nome), n = sh.getLastRow() - 1;
   if (n < 1) return [];
   const tz = SpreadsheetApp.getActive().getSpreadsheetTimeZone();
   return sh.getRange(2, 1, n, cols.length).getValues()
@@ -100,8 +114,11 @@ function tutto() {
 
 function salva(nome, riga) {
   if (!riga || !riga.id) throw new Error('manca id');
-  const sh = foglio(nome), cols = COLONNE[nome];
+  const sh = foglio(nome);
+  let cols = colonne(sh, nome);
   if (nome === 'config' && typeof riga.valore !== 'string') riga.valore = JSON.stringify(riga.valore);
+  const nuove = Object.keys(riga).filter(k => cols.indexOf(k) < 0 && /^[a-zA-Z][a-zA-Z0-9]{0,30}$/.test(k) && k !== 'autore' && riga[k] !== null && riga[k] !== undefined && riga[k] !== '');
+  if (nuove.length && cols.length + nuove.length <= 40) { aggiungiColonne(sh, cols, nuove); cols = cols.concat(nuove); }
   const valori = cols.map(c => {
     const v = riga[c];
     if (v === undefined || v === null) return '';

@@ -114,6 +114,22 @@ section.view{display:flex;flex-direction:column;gap:16px;padding-top:16px}
 .cal .day.blank{background:none}
 .cal .day .dn{font-size:.72rem;font-weight:600;color:var(--muted);padding-left:5px}
 .cal .day.today .dn{color:var(--accent);font-weight:800}
+.rp{background:var(--surface2);border-radius:12px;padding:10px;margin-bottom:12px;touch-action:pan-y}
+.rp .rphead{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.rp .rphead b{text-transform:capitalize}
+.rp .rpsel{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+.rp .rpsel div{background:var(--surface);border:1.5px solid var(--line);border-radius:10px;padding:6px 10px;font-size:.8rem;color:var(--muted)}
+.rp .rpsel div b{display:block;color:var(--ink);font-size:.98rem}
+.rp .rpsel div.on{border-color:var(--accent)}
+.rpg{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:2px}
+.rpg .dow{font-size:.66rem;font-weight:700;color:var(--muted);text-align:center;text-transform:uppercase;padding-bottom:2px}
+.rpg button{border:0;background:var(--surface);border-radius:8px;min-height:40px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--ink);padding:0}
+.rpg button.busy{background:repeating-linear-gradient(135deg,var(--surface) 0 5px,color-mix(in srgb,var(--out) 22%,var(--surface)) 5px 9px);color:var(--muted)}
+.rpg button.in{background:color-mix(in srgb,var(--accent) 22%,var(--surface))}
+.rpg button.sel{background:var(--accent);color:var(--surface)}
+.rpg button.td{outline:2px solid var(--wood);outline-offset:-2px}
+.rpg span{min-height:40px}
+.rp .rpnote{font-size:.76rem;color:var(--muted);margin:6px 2px 0}
 .bar{height:17px;border:0;padding:0 4px;font-size:.66rem;font-weight:700;line-height:17px;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:clip;color:var(--accent-ink);display:block;width:100%;min-width:0}
 .bar.PT{background:var(--pt)} .bar.PB{background:var(--pb)}
 .bar.priv{background:repeating-linear-gradient(135deg,var(--c2) 0 4px,color-mix(in srgb,var(--c2) 55%,var(--bg)) 4px 8px)}
@@ -404,7 +420,7 @@ let CONN=null; try{ CONN=JSON.parse(localStorage.getItem('chalet-conn')||'null')
 const numOrNull = v => (v===''||v===null||v===undefined) ? null : +v;
 const bool = v => v===true || v==='TRUE' || v==='true' || v===1;
 function normMov(m){ return { ...m, id:String(m.id), importo:+m.importo||0, caparra:+m.caparra||0, saldato:bool(m.saldato),
-  lenzuola:numOrNull(m.lenzuola), pulizie:numOrNull(m.pulizie), data:m.data||'', dataFine:m.dataFine||'', note:m.note||'', descrizione:m.descrizione===''?'':String(m.descrizione??''), esercizio:String(m.esercizio) }; }
+  lenzuola:numOrNull(m.lenzuola), pulizie:numOrNull(m.pulizie), cani:+m.cani||0, data:m.data||'', dataFine:m.dataFine||'', note:m.note||'', descrizione:m.descrizione===''?'':String(m.descrizione??''), esercizio:String(m.esercizio) }; }
 function normEs(x){ const o={...x, id:String(x.id), chiuso:bool(x.chiuso), cassaReale:numOrNull(x.cassaReale)};
   ['fondoCassa','utiliPT','utiliPB','quotaPT','provvPct','provvPagate'].forEach(k=>o[k]=+x[k]||0);
   ['provvGiacomo','provvPapa'].forEach(k=>o[k]=numOrNull(x[k])); if(!o.pulizieDal) delete o.pulizieDal; else o.pulizieDal=String(o.pulizieDal).slice(0,10); return o; }
@@ -500,7 +516,7 @@ function rowAffitto(m,e){
   return `<button class="row" data-id="${esc(m.id)}">
     <span class="d num">${dayBox(m.data)}</span>
     <span class="t"><span class="n">${esc(m.descrizione||'Ospite')}</span>
-      <span class="m">${pianoChip(m)}${esc(canL(m.canale)||'—')}${n?` · ${n} ${n===1?'notte':'notti'}`:''}${m.dataFine?` · fino al ${+m.dataFine.slice(8,10)} ${MESI[+m.dataFine.slice(5,7)-1]}`:''}
+      <span class="m">${pianoChip(m)}${esc(canL(m.canale)||'—')}${n?` · ${n} ${n===1?'notte':'notti'}`:''}${m.dataFine?` · fino al ${+m.dataFine.slice(8,10)} ${MESI[+m.dataFine.slice(5,7)-1]}`:''}${+m.cani?` · 🐕 ${+m.cani}`:''}
       ${residuo(m)>0?`<span class="pill">${+m.caparra&&!m.saldato?`caparra ${eur0(Math.min(+m.importo,+m.caparra))} · `:''}saldo ${eur0(daOspite(m))}${extra(m)?` (di cui ${eur0(extra(m))} pulizie)`:''}</span>`:''}${w?`<span class="pill bad">⚠ ${esc(w)}</span>`:''}</span></span>
     <span class="a num ${priv?'':'in'}">${priv?'privato':eur(totale(m))}</span></button>`;
 }
@@ -518,6 +534,11 @@ function rowCosto(m,e){
     <span class="a num out">−${eur(m.importo)}</span></button>`;
 }
 
+/* sfoglia con il dito: verso sinistra = mese dopo, verso destra = mese prima */
+function swipe(el, next, prev){ if(!el) return; let x0=null,y0=null;
+  el.addEventListener('touchstart',ev=>{ const t=ev.touches[0]; x0=t.clientX; y0=t.clientY; },{passive:true});
+  el.addEventListener('touchend',ev=>{ if(x0===null) return; const t=ev.changedTouches[0], dx=t.clientX-x0, dy=t.clientY-y0; x0=null;
+    if(Math.abs(dx)>50 && Math.abs(dx)>Math.abs(dy)*1.3){ if(dx<0) next(); else prev(); } },{passive:true}); }
 /* ----- AFFITTI ----- */
 function calendar(ents){
   const [y,mo]=S.calM;
@@ -576,6 +597,7 @@ function renderAffitti(e,r){
   $('#addAff').onclick=()=>openForm(null,'Entrata');
   $('#calPrev').onclick=()=>{ S.calM = mo===0?[y-1,11]:[y,mo-1]; render(); };
   $('#calNext').onclick=()=>{ S.calM = mo===11?[y+1,0]:[y,mo+1]; render(); };
+  swipe($('#v-affitti .cal'), ()=>$('#calNext').click(), ()=>$('#calPrev').click());
   bindRows(v);
 }
 
@@ -793,7 +815,9 @@ function openForm(m, tipo, preset){
   const isNew=!m;
   const d = m ? {...m} : Object.assign({ tipo, data:today(), dataFine:'', piano: tipo==='Uscita'?'Comune':'PT', canale: tipo==='Entrata'?'Cash':'',
      categoria: tipo==='Entrata'?'AFFITTO':(tipo==='Prelievo'?'DIVIDENDO':(tipo==='Deposito'?'CAPARRA':'VARIE')), descrizione: tipo==='Prelievo'?'Prelievo dividendo':'', importo:'', caparra:'', saldato:tipo!=='Entrata'&&tipo!=='Deposito', lenzuola:null, pulizie:null, note:'' }, preset||{});
-  if(d.tipo==='Entrata' && isNew && !d.dataFine) d.dataFine=addDays(d.data,1);
+  if(d.tipo==='Entrata' && isNew && !(preset&&preset.data)) d.data='';
+  d.cani = +d.cani||0; d.haCani = d.cani>0;
+  { const b=d.data || (S.calM ? iso(new Date(S.calM[0],S.calM[1],1)) : today()); d.pkM=[+b.slice(0,4), +b.slice(5,7)-1]; }
   if(d.tipo==='Entrata') d.tot = (d.importo===''||d.importo===null||d.importo===undefined) ? '' : totale(d);
   /* pulizie automatiche: 70 € a piano (140 tutta la casa), niente per uso privato. Sui soggiorni già chiusi prima della regola restano quelle salvate */
   const esF = (m && S.eser[m.esercizio]) || cur();
@@ -813,8 +837,10 @@ function openForm(m, tipo, preset){
       <div class="field"${dep?' hidden':''}><span>${pre?'Di quale piano':'Piano'}</span><div class="seg" role="group">${pianoOpts.map(([k,l])=>`<button data-pi="${k}" aria-pressed="${d.piano===k}">${l}</button>`).join('')}</div></div>
       ${ent?`<div class="field"><span>Canale</span><div class="seg" role="group">${CANALI.map(c=>`<button data-c="${c}" aria-pressed="${d.canale===c}">${c==='Uso privato'?'Privato':canL(c)}</button>`).join('')}</div></div>
         <label class="field"><span>Ospite</span><input id="f-desc" value="${esc(d.descrizione)}" placeholder="es. Rossi" autocomplete="off"></label>
-        <div class="grid2"><label class="field"><span>Arrivo</span><input id="f-data" type="date" value="${esc(d.data)}"></label>
-          <label class="field"><span>Partenza</span><input id="f-fine" type="date" value="${esc(d.dataFine)}"></label></div>
+        <div class="field"><span>Date del soggiorno</span><div class="rp" id="rp"></div>
+          <input id="f-data" type="hidden" value="${esc(d.data)}"><input id="f-fine" type="hidden" value="${esc(d.dataFine)}"></div>
+        <div class="grid2"><label class="toggle" style="align-self:center"><input id="f-hcani" type="checkbox" ${d.haCani?'checked':''}> Ospiti con cani</label>
+          ${d.haCani?`<label class="field" style="margin:0"><span>Quanti cani</span><select id="f-cani">${[1,2,3,4,5].map(n=>`<option value="${n}"${n===(d.cani||1)?' selected':''}>${n}</option>`).join('')}</select></label>`:'<span></span>'}</div>
         <div class="grid2"><label class="field"><span>Prezzo totale €</span><input id="f-imp" class="amount" type="number" inputmode="decimal" step="0.01" value="${d.tot===''?'':d.tot}" placeholder="0"></label><span></span></div>
         <p class="info num" id="fInfo"></p>
         <div class="grid2"><label class="field"><span>Caparra già versata €</span><input id="f-cap" type="number" inputmode="decimal" step="0.01" value="${d.caparra===''||d.caparra===null||d.caparra===undefined?'':d.caparra}" placeholder="0"></label>
@@ -831,7 +857,7 @@ function openForm(m, tipo, preset){
       <div class="actions"><button class="btn primary" id="fSave">Salva</button>${isNew?'<span></span>':'<button class="btn danger" id="fDel">Elimina</button>'}</div>
     </div>`;
     const grab=()=>{ d.descrizione=$('#f-desc').value; d.data=$('#f-data').value; if($('#f-fine')) d.dataFine=$('#f-fine').value;
-      if(ent){ d.tot=$('#f-imp').value; if($('#f-ppul')) d.privPul=$('#f-ppul').checked; if(pulAuto()) d.pulizie=autoPul();
+      if(ent){ d.tot=$('#f-imp').value; d.haCani=$('#f-hcani').checked; d.cani = d.haCani ? (+($('#f-cani')||{}).value||1) : 0; if($('#f-ppul')) d.privPul=$('#f-ppul').checked; if(pulAuto()) d.pulizie=autoPul();
         d.importo = d.canale==='Uso privato' ? 0 : (d.tot==='' ? '' : r2(+d.tot - (+d.pulizie||0) - (+d.lenzuola||0))); if(d.canale==='Uso privato') d.tot=0; }
       else d.importo=$('#f-imp').value;
       if($('#f-sal')) d.saldato=$('#f-sal').checked; d.note=$('#f-note').value;
@@ -848,8 +874,29 @@ function openForm(m, tipo, preset){
     sh.querySelectorAll('[data-pi]').forEach(b=>b.onclick=()=>{ grab(); d.piano=b.dataset.pi; draw(); });
     sh.querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>{ grab(); d.canale=b.dataset.c; if(d.canale==='Uso privato' && (d.tot===''||d.tot===undefined)) d.tot=0; draw(); });
     if(ent){
-      $('#f-data').onchange=()=>{ grab(); if(!d.dataFine || d.dataFine<=d.data){ d.dataFine=addDays(d.data,1); $('#f-fine').value=d.dataFine; } info(); };
-      $('#f-fine').onchange=info; $('#f-imp').oninput=info; $('#f-cap').oninput=info; $('#f-sal').onchange=info; if($('#f-ppul')) $('#f-ppul').onchange=info;
+      const rp=()=>{ const el=$('#rp'); if(!el) return; const [y,mo]=d.pkM;
+        const first=new Date(y,mo,1), sd=(first.getDay()+6)%7, days=new Date(y,mo+1,0).getDate(), t=today();
+        const oth=S.movs.filter(o=>o.tipo==='Entrata' && o.id!==d.id && o.data && o.dataFine && (o.piano===d.piano || o.piano==='Comune' || d.piano==='Comune'));
+        const busy=ds=>oth.some(o=>o.data<=ds && ds<o.dataFine);
+        const lab=s=>s?`${+s.slice(8,10)} ${MESI[+s.slice(5,7)-1]}`:'—';
+        let g=['lun','mar','mer','gio','ven','sab','dom'].map(x=>`<div class="dow">${x}</div>`).join('');
+        for(let i=0;i<sd;i++) g+='<span></span>';
+        for(let k=1;k<=days;k++){ const ds=iso(new Date(y,mo,k));
+          const sel = ds===d.data || ds===d.dataFine, inR = d.data && d.dataFine && ds>d.data && ds<d.dataFine;
+          g+=`<button type="button" data-ds="${ds}" class="${busy(ds)?'busy ':''}${sel?'sel ':inR?'in ':''}${ds===t?'td':''}" aria-pressed="${sel}">${k}</button>`; }
+        const step = !d.data || d.dataFine ? 'arr' : 'par';
+        el.innerHTML=`<div class="rpsel"><div class="${step==='arr'?'on':''}">Arrivo<b>${lab(d.data)}</b></div><div class="${step==='par'?'on':''}">Partenza<b>${lab(d.dataFine)}</b></div></div>
+          <div class="rphead"><button type="button" class="btn small" id="rpPrev" aria-label="Mese precedente">‹</button><b>${MESI_L[mo]} ${y}</b><button type="button" class="btn small" id="rpNext" aria-label="Mese successivo">›</button></div>
+          <div class="rpg">${g}</div><p class="rpnote">${step==='arr'?'Tocca il giorno di arrivo':'Ora tocca il giorno di partenza'} · a righe i giorni già occupati</p>`;
+        const mv=dlt=>{ let m2=mo+dlt, y2=y; if(m2<0){m2=11;y2--;} if(m2>11){m2=0;y2++;} d.pkM=[y2,m2]; rp(); };
+        $('#rpPrev').onclick=()=>mv(-1); $('#rpNext').onclick=()=>mv(1);
+        el.querySelectorAll('[data-ds]').forEach(b=>b.onclick=()=>{ const ds=b.dataset.ds;
+          if(!d.data || d.dataFine || ds<=d.data){ d.data=ds; d.dataFine=''; } else d.dataFine=ds;
+          $('#f-data').value=d.data; $('#f-fine').value=d.dataFine; rp(); info(); });
+      };
+      rp(); swipe($('#rp'), ()=>$('#rpNext').click(), ()=>$('#rpPrev').click());
+      $('#f-hcani').onchange=()=>{ grab(); if(d.haCani && !d.cani) d.cani=1; draw(); };
+      $('#f-imp').oninput=info; $('#f-cap').oninput=info; $('#f-sal').onchange=info; if($('#f-ppul')) $('#f-ppul').onchange=info;
       info();
     }
     $('#fClose').onclick=close;
@@ -869,6 +916,7 @@ function openForm(m, tipo, preset){
         note:d.note.trim(), esercizio: esN };
       if(ent){ out.caparra = d.caparra===''||d.caparra===null||d.caparra===undefined ? 0 : r2(+d.caparra); 
         out.lenzuola = d.lenzuola===''||d.lenzuola===null||d.lenzuola===undefined?null:+d.lenzuola; out.pulizie = d.pulizie===''||d.pulizie===null||d.pulizie===undefined?null:+d.pulizie;
+        out.cani = d.haCani ? (+d.cani||1) : 0;
         if(+d.tot>0 && out.caparra>=+d.tot) out.saldato=true; }
       const b=$('#fSave'); b.disabled=true; b.textContent='Salvo…';
       try{ await saveMov(isNew?null:m.id,out); close(); toast(esN!==S.cur?'Salvato nell\'esercizio '+esN.replace('-','/'):(isNew?'Salvato':'Modifiche salvate')); }
