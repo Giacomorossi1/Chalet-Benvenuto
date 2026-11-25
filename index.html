@@ -846,7 +846,7 @@ function openForm(m, tipo, preset){
         <p class="info num" id="fInfo"></p>
         <div class="grid2"><label class="field"><span>Caparra già versata €</span><input id="f-cap" type="number" inputmode="decimal" step="0.01" value="${d.caparra===''||d.caparra===null||d.caparra===undefined?'':d.caparra}" placeholder="0"></label>
           <label class="toggle" style="align-self:end;padding-bottom:10px"><input id="f-sal" type="checkbox" ${d.saldato?'checked':''}> Saldato tutto</label></div>
-        ${d.canale==='Uso privato'?`<label class="toggle" style="margin-bottom:10px"><input id="f-ppul" type="checkbox" ${d.privPul?'checked':''}> Con pulizie (${d.piano==='Comune'?'140':'70'} €, spesa ${d.piano==='Comune'?'comune':'del piano'})</label>`:''}
+        <label class="toggle" id="f-ppulBox" style="margin-bottom:10px"${d.canale==='Uso privato'?'':' hidden'}><input id="f-ppul" type="checkbox" ${d.privPul?'checked':''}> <span id="f-ppulT">Con pulizie (${d.piano==='Comune'?'140':'70'} €, spesa ${d.piano==='Comune'?'comune':'del piano'})</span></label>
         <p class="info num" id="fSaldo"></p>`
       : `${pre||dep?'':`<label class="field"><span>Categoria</span><select id="f-cat">${[...new Set([...S.cats, d.categoria].filter(Boolean))].map(c=>`<option value="${esc(c)}"${c===d.categoria?' selected':''}>${esc(cap(c))}</option>`).join('')}</select></label>`}
         <label class="field"><span>Importo €</span><input id="f-imp" class="amount" type="number" inputmode="decimal" step="0.01" value="${d.importo===''||d.importo===null?'':d.importo}" placeholder="0,00"></label>
@@ -872,8 +872,10 @@ function openForm(m, tipo, preset){
         (o.piano===d.piano || o.piano==='Comune' || d.piano==='Comune') && o.data<d.dataFine && d.data<o.dataFine);
       const ex=extra(d);
       el.innerHTML = `${n?`${n} ${n===1?'notte':'notti'}`:'Scegli le date per vedere le notti.'}${d.tot!==''&&+d.tot?`<br>di cui pulizie ${eur(+d.pulizie||0)}${+d.lenzuola?` e lenzuola ${eur(+d.lenzuola)}`:''} (alla signora) · incasso ${eur(+d.tot-ex)}`:''}${over.length?`<br><span class="err">Si sovrappone a ${over.map(o=>esc(o.descrizione||'un\'altra prenotazione')+' ('+fmtD(o.data)+')').join(', ')}</span>`:''}`; };
-    sh.querySelectorAll('[data-pi]').forEach(b=>b.onclick=()=>{ grab(); d.piano=b.dataset.pi; draw(); });
-    sh.querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>{ grab(); d.canale=b.dataset.c; if(d.canale==='Uso privato' && (d.tot===''||d.tot===undefined)) d.tot=0; draw(); });
+    /* nella prenotazione piano e canale si aggiornano sul posto, senza ridisegnare la scheda (che altrimenti torna in cima) */
+    let refresh=null;
+    sh.querySelectorAll('[data-pi]').forEach(b=>b.onclick=()=>{ grab(); d.piano=b.dataset.pi; if(!refresh) return draw(); refresh(); });
+    sh.querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>{ grab(); d.canale=b.dataset.c; if(d.canale==='Uso privato' && (d.tot===''||d.tot===undefined)){ d.tot=0; $('#f-imp').value=0; } refresh(); });
     if(ent){
       const rp=()=>{ const el=$('#rp'); if(!el) return; const [y,mo]=d.pkM;
         const first=new Date(y,mo,1), sd=(first.getDay()+6)%7, days=new Date(y,mo+1,0).getDate(), t=today();
@@ -895,6 +897,11 @@ function openForm(m, tipo, preset){
           if(!d.data || d.dataFine || ds<=d.data){ d.data=ds; d.dataFine=''; } else d.dataFine=ds;
           $('#f-data').value=d.data; $('#f-fine').value=d.dataFine; rp(); info(); });
       };
+      refresh=()=>{ sh.querySelectorAll('[data-pi]').forEach(x=>x.setAttribute('aria-pressed', x.dataset.pi===d.piano));
+        sh.querySelectorAll('[data-c]').forEach(x=>x.setAttribute('aria-pressed', x.dataset.c===d.canale));
+        $('#f-ppulBox').hidden = d.canale!=='Uso privato'; if(d.canale!=='Uso privato') $('#f-ppul').checked=false;
+        $('#f-ppulT').textContent = `Con pulizie (${d.piano==='Comune'?'140':'70'} €, spesa ${d.piano==='Comune'?'comune':'del piano'})`;
+        rp(); info(); };
       rp(); swipe($('#rp'), ()=>$('#rpNext').click(), ()=>$('#rpPrev').click());
       $('#f-hcani').onchange=()=>{ $('#f-caniBox').hidden=!$('#f-hcani').checked; grab(); };
       $('#f-imp').oninput=info; $('#f-cap').oninput=info; $('#f-sal').onchange=info; if($('#f-ppul')) $('#f-ppul').onchange=info;
