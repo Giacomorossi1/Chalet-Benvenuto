@@ -420,7 +420,7 @@ let CONN=null; try{ CONN=JSON.parse(localStorage.getItem('chalet-conn')||'null')
 const numOrNull = v => (v===''||v===null||v===undefined) ? null : +v;
 const bool = v => v===true || v==='TRUE' || v==='true' || v===1;
 function normMov(m){ return { ...m, id:String(m.id), importo:+m.importo||0, caparra:+m.caparra||0, saldato:bool(m.saldato),
-  lenzuola:numOrNull(m.lenzuola), pulizie:numOrNull(m.pulizie), cani:+m.cani||0, data:m.data||'', dataFine:m.dataFine||'', note:m.note||'', descrizione:m.descrizione===''?'':String(m.descrizione??''), esercizio:String(m.esercizio) }; }
+  lenzuola:numOrNull(m.lenzuola), pulizie:numOrNull(m.pulizie), cani:+m.cani||0, persone:+m.persone||0, data:m.data||'', dataFine:m.dataFine||'', note:m.note||'', descrizione:m.descrizione===''?'':String(m.descrizione??''), esercizio:String(m.esercizio) }; }
 function normEs(x){ const o={...x, id:String(x.id), chiuso:bool(x.chiuso), cassaReale:numOrNull(x.cassaReale)};
   ['fondoCassa','utiliPT','utiliPB','quotaPT','provvPct','provvPagate'].forEach(k=>o[k]=+x[k]||0);
   ['provvGiacomo','provvPapa'].forEach(k=>o[k]=numOrNull(x[k])); if(!o.pulizieDal) delete o.pulizieDal; else o.pulizieDal=String(o.pulizieDal).slice(0,10); return o; }
@@ -516,7 +516,7 @@ function rowAffitto(m,e){
   return `<button class="row" data-id="${esc(m.id)}">
     <span class="d num">${dayBox(m.data)}</span>
     <span class="t"><span class="n">${esc(m.descrizione||'Ospite')}</span>
-      <span class="m">${pianoChip(m)}${esc(canL(m.canale)||'—')}${n?` · ${n} ${n===1?'notte':'notti'}`:''}${m.dataFine?` · fino al ${+m.dataFine.slice(8,10)} ${MESI[+m.dataFine.slice(5,7)-1]}`:''}${+m.cani?` · 🐕 ${+m.cani}`:''}
+      <span class="m">${pianoChip(m)}${esc(canL(m.canale)||'—')}${n?` · ${n} ${n===1?'notte':'notti'}`:''}${m.dataFine?` · fino al ${+m.dataFine.slice(8,10)} ${MESI[+m.dataFine.slice(5,7)-1]}`:''}${+m.cani?` · 🐕 ${+m.cani}`:''}${+m.persone?` · lenzuola ${+m.persone} pers.`:''}
       ${residuo(m)>0?`<span class="pill">${+m.caparra&&!m.saldato?`caparra ${eur0(Math.min(+m.importo,+m.caparra))} · `:''}saldo ${eur0(daOspite(m))}${extra(m)?` (di cui ${eur0(extra(m))} pulizie)`:''}</span>`:''}${w?`<span class="pill bad">⚠ ${esc(w)}</span>`:''}</span></span>
     <span class="a num ${priv?'':'in'}">${priv?'privato':eur(totale(m))}</span></button>`;
 }
@@ -817,6 +817,7 @@ function openForm(m, tipo, preset){
      categoria: tipo==='Entrata'?'AFFITTO':(tipo==='Prelievo'?'DIVIDENDO':(tipo==='Deposito'?'CAPARRA':'VARIE')), descrizione: tipo==='Prelievo'?'Prelievo dividendo':'', importo:'', caparra:'', saldato:tipo!=='Entrata'&&tipo!=='Deposito', lenzuola:null, pulizie:null, note:'' }, preset||{});
   if(d.tipo==='Entrata' && isNew && !(preset&&preset.data)) d.data='';
   d.cani = +d.cani||0; d.haCani = d.cani>0;
+  d.persone = +d.persone||0; d.haLenz = d.persone>0;
   { const b=d.data || (S.calM ? iso(new Date(S.calM[0],S.calM[1],1)) : today()); d.pkM=[+b.slice(0,4), +b.slice(5,7)-1]; }
   if(d.tipo==='Entrata') d.tot = (d.importo===''||d.importo===null||d.importo===undefined) ? '' : totale(d);
   /* pulizie automatiche: 70 € a piano (140 tutta la casa), niente per uso privato. Sui soggiorni già chiusi prima della regola restano quelle salvate */
@@ -842,6 +843,8 @@ function openForm(m, tipo, preset){
           <input id="f-data" type="hidden" value="${esc(d.data)}"><input id="f-fine" type="hidden" value="${esc(d.dataFine)}"></div>
         <div class="grid2"><label class="toggle" style="align-self:center"><input id="f-hcani" type="checkbox" ${d.haCani?'checked':''}> Ospiti con cani</label>
           <label class="field" id="f-caniBox" style="margin:0"${d.haCani?'':' hidden'}><span>Quanti cani</span><select id="f-cani">${[1,2,3,4,5].map(n=>`<option value="${n}"${n===(d.cani||1)?' selected':''}>${n}</option>`).join('')}</select></label></div>
+        <div class="grid2" id="f-lenzRow"${d.canale==='Uso privato'?' hidden':''}><label class="toggle" style="align-self:center"><input id="f-hlenz" type="checkbox" ${d.haLenz?'checked':''}> Aggiunta lenzuola</label>
+          <label class="field" id="f-lenzBox" style="margin:0"${d.haLenz?'':' hidden'}><span>Persone (10 € l'una)</span><input id="f-pers" type="number" inputmode="numeric" min="1" step="1" value="${d.persone||''}" placeholder="0"></label></div>
         <div class="grid2"><label class="field"><span>Prezzo totale €</span><input id="f-imp" class="amount" type="number" inputmode="decimal" step="0.01" value="${d.tot===''?'':d.tot}" placeholder="0"></label><span></span></div>
         <p class="info num" id="fInfo"></p>
         <div class="grid2"><label class="field"><span>Caparra già versata €</span><input id="f-cap" type="number" inputmode="decimal" step="0.01" value="${d.caparra===''||d.caparra===null||d.caparra===undefined?'':d.caparra}" placeholder="0"></label>
@@ -858,7 +861,8 @@ function openForm(m, tipo, preset){
       <div class="actions"><button class="btn primary" id="fSave">Salva</button>${isNew?'<span></span>':'<button class="btn danger" id="fDel">Elimina</button>'}</div>
     </div>`;
     const grab=()=>{ d.descrizione=$('#f-desc').value; d.data=$('#f-data').value; if($('#f-fine')) d.dataFine=$('#f-fine').value;
-      if(ent){ d.tot=$('#f-imp').value; d.haCani=$('#f-hcani').checked; d.cani = d.haCani ? (+($('#f-cani')||{}).value||1) : 0; if($('#f-ppul')) d.privPul=$('#f-ppul').checked; if(pulAuto()) d.pulizie=autoPul();
+      if(ent){ d.tot=$('#f-imp').value; d.haCani=$('#f-hcani').checked; d.cani = d.haCani ? (+($('#f-cani')||{}).value||1) : 0;
+        d.haLenz = d.canale!=='Uso privato' && $('#f-hlenz').checked; d.persone = d.haLenz ? Math.max(0,Math.round(+$('#f-pers').value||0)) : 0;  if($('#f-ppul')) d.privPul=$('#f-ppul').checked; if(pulAuto()) d.pulizie=autoPul();
         d.importo = d.canale==='Uso privato' ? 0 : (d.tot==='' ? '' : r2(+d.tot - (+d.pulizie||0) - (+d.lenzuola||0))); if(d.canale==='Uso privato') d.tot=0; }
       else d.importo=$('#f-imp').value;
       if($('#f-sal')) d.saldato=$('#f-sal').checked; d.note=$('#f-note').value;
@@ -871,7 +875,7 @@ function openForm(m, tipo, preset){
       const over = S.movs.filter(o=>o.tipo==='Entrata' && o.id!==d.id && o.data && o.dataFine && d.data && d.dataFine &&
         (o.piano===d.piano || o.piano==='Comune' || d.piano==='Comune') && o.data<d.dataFine && d.data<o.dataFine);
       const ex=extra(d);
-      el.innerHTML = `${n?`${n} ${n===1?'notte':'notti'}`:'Scegli le date per vedere le notti.'}${d.tot!==''&&+d.tot?`<br>di cui pulizie ${eur(+d.pulizie||0)}${+d.lenzuola?` e lenzuola ${eur(+d.lenzuola)}`:''} (alla signora) · incasso ${eur(+d.tot-ex)}`:''}${over.length?`<br><span class="err">Si sovrappone a ${over.map(o=>esc(o.descrizione||'un\'altra prenotazione')+' ('+fmtD(o.data)+')').join(', ')}</span>`:''}`; };
+      el.innerHTML = `${n?`${n} ${n===1?'notte':'notti'}`:'Scegli le date per vedere le notti.'}${d.tot!==''&&+d.tot?`<br>di cui pulizie ${eur(+d.pulizie||0)}${+d.lenzuola?` e lenzuola ${eur(+d.lenzuola)}`:''} (alla signora) · incasso ${eur(+d.tot-ex)}${d.haLenz&&d.persone?` (compresi ${eur(d.persone*10)} di lenzuola per ${d.persone} ${d.persone===1?'persona':'persone'})`:''}`:''}${over.length?`<br><span class="err">Si sovrappone a ${over.map(o=>esc(o.descrizione||'un\'altra prenotazione')+' ('+fmtD(o.data)+')').join(', ')}</span>`:''}`; };
     /* nella prenotazione piano e canale si aggiornano sul posto, senza ridisegnare la scheda (che altrimenti torna in cima) */
     let refresh=null;
     sh.querySelectorAll('[data-pi]').forEach(b=>b.onclick=()=>{ grab(); d.piano=b.dataset.pi; if(!refresh) return draw(); refresh(); });
@@ -899,10 +903,12 @@ function openForm(m, tipo, preset){
       };
       refresh=()=>{ sh.querySelectorAll('[data-pi]').forEach(x=>x.setAttribute('aria-pressed', x.dataset.pi===d.piano));
         sh.querySelectorAll('[data-c]').forEach(x=>x.setAttribute('aria-pressed', x.dataset.c===d.canale));
-        $('#f-ppulBox').hidden = d.canale!=='Uso privato'; if(d.canale!=='Uso privato') $('#f-ppul').checked=false;
+        $('#f-ppulBox').hidden = d.canale!=='Uso privato'; $('#f-lenzRow').hidden = d.canale==='Uso privato'; if(d.canale!=='Uso privato') $('#f-ppul').checked=false;
         $('#f-ppulT').textContent = `Con pulizie (${d.piano==='Comune'?'140':'70'} €, spesa ${d.piano==='Comune'?'comune':'del piano'})`;
         rp(); info(); };
       rp(); swipe($('#rp'), ()=>$('#rpNext').click(), ()=>$('#rpPrev').click());
+      $('#f-hlenz').onchange=()=>{ $('#f-lenzBox').hidden=!$('#f-hlenz').checked; info(); if($('#f-hlenz').checked && !$('#f-pers').value) $('#f-pers').focus({preventScroll:true}); };
+      $('#f-pers').oninput=info;
       $('#f-hcani').onchange=()=>{ $('#f-caniBox').hidden=!$('#f-hcani').checked; grab(); };
       $('#f-imp').oninput=info; $('#f-cap').oninput=info; $('#f-sal').onchange=info; if($('#f-ppul')) $('#f-ppul').onchange=info;
       info();
@@ -918,6 +924,7 @@ function openForm(m, tipo, preset){
       if(ent && +d.importo < 0) return fail('Il totale è più basso delle pulizie ('+eur(extra(d))+').');
       if(ent && +d.caparra > +d.tot) return fail('La caparra è più alta del totale.');
       if(ent && !d.dataFine) return fail('Manca la data di partenza.');
+      if(ent && d.haLenz && !d.persone) return fail('Scrivi per quante persone sono le lenzuola.');
       if(ent && d.dataFine<=d.data) return fail('La partenza deve essere dopo l\'arrivo.');
       const esN = (isNew || d.data!==m.data) ? (dep ? (esForDate(d.data)||cur()).id : esIdFor(d.data)) : d.esercizio;
       const out={ data:d.data, dataFine:ent?d.dataFine:'', tipo:d.tipo, piano:d.piano, canale:ent?d.canale:'',
@@ -925,7 +932,7 @@ function openForm(m, tipo, preset){
         note:d.note.trim(), esercizio: esN };
       if(ent){ out.caparra = d.caparra===''||d.caparra===null||d.caparra===undefined ? 0 : r2(+d.caparra); 
         out.lenzuola = d.lenzuola===''||d.lenzuola===null||d.lenzuola===undefined?null:+d.lenzuola; out.pulizie = d.pulizie===''||d.pulizie===null||d.pulizie===undefined?null:+d.pulizie;
-        out.cani = d.haCani ? (+d.cani||1) : 0;
+        out.cani = d.haCani ? (+d.cani||1) : 0; out.persone = d.haLenz ? d.persone : 0;
         if(+d.tot>0 && out.caparra>=+d.tot) out.saldato=true; }
       const b=$('#fSave'); b.disabled=true; b.textContent='Salvo…';
       try{ await saveMov(isNew?null:m.id,out); close(); toast(esN!==S.cur?'Salvato nell\'esercizio '+esN.replace('-','/'):(isNew?'Salvato':'Modifiche salvate')); }
