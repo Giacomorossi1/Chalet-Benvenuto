@@ -190,8 +190,15 @@ details.card[open] summary{margin-bottom:8px}
 .promemoria{border:1.5px solid var(--wood);background:color-mix(in srgb,var(--wood) 7%,var(--surface))}
 /* foglio di inserimento */
 .sheet{position:fixed;inset:0;z-index:20;background:color-mix(in srgb,#000 45%,transparent);display:flex;align-items:flex-end;justify-content:center}
-.sheet .panel{background:var(--surface);width:100%;max-width:560px;max-height:92vh;overflow-y:auto;border-radius:16px 16px 0 0;padding:18px max(16px,env(safe-area-inset-right,0px)) calc(18px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:14px}
+.sheet .panel{background:var(--surface);width:100%;max-width:560px;max-height:92vh;max-height:92dvh;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;box-sizing:border-box;border-radius:16px 16px 0 0;padding:18px max(16px,env(safe-area-inset-right,0px)) calc(18px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:14px}
 @media (min-width:700px){.sheet{align-items:center}.sheet .panel{border-radius:16px}}
+.sheet .panel>*{flex-shrink:0;margin-top:0;margin-bottom:0}
+.sheet .panel input,.sheet .panel select,.sheet .panel textarea{font-size:16px}
+.sheet .panel input.amount{font-size:1.4rem}
+.sheet .panel *{box-sizing:border-box;max-width:100%}
+.optrow{min-height:68px;align-items:end}
+.optrow .toggle{min-height:44px}
+body.noscroll{overflow:hidden}
 .field{display:flex;flex-direction:column;gap:5px;min-width:0}
 .field>span{font-size:.78rem;font-weight:600;color:var(--muted)}
 .field input,.field select,.field textarea{width:100%;min-width:0;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg)}
@@ -204,7 +211,7 @@ details.card[open] summary{margin-bottom:8px}
 .search{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
 
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-weight:600;z-index:30;max-width:calc(100% - 32px)}
-@media (prefers-reduced-motion:no-preference){.sheet .panel{animation:up .18s ease-out}@keyframes up{from{transform:translateY(24px);opacity:.6}}}
+@media (prefers-reduced-motion:no-preference){.sheet .panel.anim{animation:up .18s ease-out}@keyframes up{from{transform:translateY(24px);opacity:.6}}}
 @media (max-width:420px){.big{font-size:1.8rem}.cal .day{min-height:56px}.grid3{grid-template-columns:1fr 1fr}.grid3>:last-child{grid-column:1/-1}}
 </style>
 
@@ -826,13 +833,14 @@ function openForm(m, tipo, preset){
   d.privPul = d.canale==='Uso privato' && +d.pulizie>0;
   const autoPul = () => (d.canale==='Uso privato' && !d.privPul) ? 0 : (d.piano==='Comune' ? 140 : 70);
   const sh=$('#sheet');
+  let firstDraw=true;
   const draw=()=>{
     const ent=d.tipo==='Entrata', pre=d.tipo==='Prelievo', dep=d.tipo==='Deposito';
     if(dep) d.piano='Comune';
     const pianoOpts = ent ? [['PT','Piano Terra'],['PB','Piano Balconi'],['Comune','Tutta la casa']] : pre ? [['PT','Piano Terra'],['PB','Piano Balconi']] : [['Comune','Comune'],['PT','Piano Terra'],['PB','Piano Balconi']];
     const title = ent?(isNew?'Nuova prenotazione':'Prenotazione'):pre?'Prelievo / dividendo':dep?'Caparra da restituire':(isNew?'Nuova spesa':'Spesa');
     const sc0=sh.scrollTop, sc1=sh.firstElementChild?sh.firstElementChild.scrollTop:0;
-    sh.innerHTML = `<div class="panel" role="dialog" aria-modal="true" aria-labelledby="fTitle">
+    sh.innerHTML = `<div class="panel${firstDraw?' anim':''}" role="dialog" aria-modal="true" aria-labelledby="fTitle">
       <div class="sectionhead"><h2 id="fTitle" style="font-size:1.2rem">${title}</h2><button class="btn small" id="fClose">Chiudi</button></div>
       ${ent && !isNew && residuo(m)>0 ? `<div class="banner num"><b>L'ospite deve ancora ${eur(daOspite(m))}</b>${extra(m)?`: ${eur(residuo(m))} di incasso + ${eur(extra(m))} di pulizie e lenzuola`:''}<br>Totale ${eur(r2(+m.importo+extra(m)))}${+m.caparra?` · caparra versata ${eur(Math.min(+m.importo,+m.caparra))}`:''}<br><button class="btn small primary" id="fPaid" style="margin-top:8px">Segna saldo incassato</button></div>`:''}
       ${dep?'<p class="sub" style="margin:0 0 10px">Soldi arrivati sul conto che dovete ridare (es. caparra di chi ha annullato). Non sono un incasso: quando li restituisci, spunta “Già restituita”.</p>':''}
@@ -841,9 +849,9 @@ function openForm(m, tipo, preset){
         <label class="field"><span>Ospite</span><input id="f-desc" value="${esc(d.descrizione)}" placeholder="es. Rossi" autocomplete="off"></label>
         <div class="field"><span>Date del soggiorno</span><div class="rp" id="rp"></div>
           <input id="f-data" type="hidden" value="${esc(d.data)}"><input id="f-fine" type="hidden" value="${esc(d.dataFine)}"></div>
-        <div class="grid2"><label class="toggle" style="align-self:center"><input id="f-hcani" type="checkbox" ${d.haCani?'checked':''}> Ospiti con cani</label>
+        <div class="grid2 optrow"><label class="toggle"><input id="f-hcani" type="checkbox" ${d.haCani?'checked':''}> Ospiti con cani</label>
           <label class="field" id="f-caniBox" style="margin:0"${d.haCani?'':' hidden'}><span>Quanti cani</span><select id="f-cani">${[1,2,3,4,5].map(n=>`<option value="${n}"${n===(d.cani||1)?' selected':''}>${n}</option>`).join('')}</select></label></div>
-        <div class="grid2" id="f-lenzRow"${d.canale==='Uso privato'?' hidden':''}><label class="toggle" style="align-self:center"><input id="f-hlenz" type="checkbox" ${d.haLenz?'checked':''}> Aggiunta lenzuola</label>
+        <div class="grid2 optrow" id="f-lenzRow"${d.canale==='Uso privato'?' hidden':''}><label class="toggle"><input id="f-hlenz" type="checkbox" ${d.haLenz?'checked':''}> Aggiunta lenzuola</label>
           <label class="field" id="f-lenzBox" style="margin:0"${d.haLenz?'':' hidden'}><span>Persone (10 € l'una)</span><input id="f-pers" type="number" inputmode="numeric" min="1" step="1" value="${d.persone||''}" placeholder="0"></label></div>
         <div class="grid2"><label class="field"><span>Prezzo totale €</span><input id="f-imp" class="amount" type="number" inputmode="decimal" step="0.01" value="${d.tot===''?'':d.tot}" placeholder="0"></label><span></span></div>
         <p class="info num" id="fInfo"></p>
@@ -891,6 +899,7 @@ function openForm(m, tipo, preset){
         for(let k=1;k<=days;k++){ const ds=iso(new Date(y,mo,k));
           const sel = ds===d.data || ds===d.dataFine, inR = d.data && d.dataFine && ds>d.data && ds<d.dataFine;
           g+=`<button type="button" data-ds="${ds}" class="${busy(ds)?'busy ':''}${sel?'sel ':inR?'in ':''}${ds===t?'td':''}" aria-pressed="${sel}">${k}</button>`; }
+        for(let i=sd+days;i<42;i++) g+='<span></span>';
         const step = !d.data || d.dataFine ? 'arr' : 'par';
         el.innerHTML=`<div class="rpsel"><div class="${step==='arr'?'on':''}">Arrivo<b>${lab(d.data)}</b></div><div class="${step==='par'?'on':''}">Partenza<b>${lab(d.dataFine)}</b></div></div>
           <div class="rphead"><button type="button" class="btn small" id="rpPrev" aria-label="Mese precedente">‹</button><b>${MESI_L[mo]} ${y}</b><button type="button" class="btn small" id="rpNext" aria-label="Mese successivo">›</button></div>
@@ -913,7 +922,7 @@ function openForm(m, tipo, preset){
       $('#f-imp').oninput=info; $('#f-cap').oninput=info; $('#f-sal').onchange=info; if($('#f-ppul')) $('#f-ppul').onchange=info;
       info();
     }
-    sh.scrollTop=sc0; if(sh.firstElementChild) sh.firstElementChild.scrollTop=sc1;
+    sh.scrollTop=sc0; if(sh.firstElementChild) sh.firstElementChild.scrollTop=sc1; firstDraw=false;
     $('#fClose').onclick=close;
     const fp=$('#fPaid'); if(fp) fp.onclick=async()=>{ fp.disabled=true; try{ await S.db.doc('movimenti/'+m.id).update({saldato:true, aggiornato:new Date().toISOString()}); close(); toast('Saldo segnato come incassato'); }catch(x){ fp.disabled=false; toast('Non salvato: '+errMsg(x)); } };
     $('#fSave').onclick=async()=>{
@@ -944,11 +953,11 @@ function openForm(m, tipo, preset){
       try{ await S.db.doc('movimenti/'+m.id).delete(); close(); toast('Eliminato'); }catch(x){ toast('Non eliminato: '+errMsg(x)); }
     };
   };
-  const close=()=>{ sh.hidden=true; sh.innerHTML=''; document.removeEventListener('keydown',onKey); };
+  const close=()=>{ sh.hidden=true; sh.innerHTML=''; document.body.classList.remove('noscroll'); document.removeEventListener('keydown',onKey); };
   const onKey=ev=>{ if(ev.key==='Escape') close(); };
   sh.onclick=ev=>{ if(ev.target===sh) close(); };
   document.addEventListener('keydown',onKey);
-  draw(); sh.hidden=false;
+  draw(); sh.hidden=false; document.body.classList.add('noscroll');
   setTimeout(()=>{ const f = d.tipo==='Entrata' ? $('#f-desc') : $('#f-imp'); if(f && isNew) f.focus(); },60);
 }
 
