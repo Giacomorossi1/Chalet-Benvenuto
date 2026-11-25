@@ -20,6 +20,7 @@ const COLONNE = {
   config:    ['id','valore']
 };
 const DATE = ['data','dataFine','inizio','dataFondoCassa','dataCassaReale','pulizieDal'];
+const TESTO = ['id','tipo','piano','canale','categoria','descrizione','note','esercizio','aggiornato','valore'];
 
 function prepara() {
   const ss = SpreadsheetApp.getActive();
@@ -29,6 +30,8 @@ function prepara() {
     const cols = COLONNE[nome];
     sh.getRange(1, 1, 1, cols.length).setValues([cols]).setFontWeight('bold').setBackground('#EFE6D5');
     sh.setFrozenRows(1);
+    // colonne di testo: niente conversioni automatiche (es. "2026-27" non deve diventare una data)
+    cols.forEach((c, i) => { if (TESTO.indexOf(c) >= 0) sh.getRange(2, i + 1, sh.getMaxRows() - 1, 1).setNumberFormat('@'); });
   });
   const vuoto = ss.getSheetByName('Foglio1') || ss.getSheetByName('Sheet1');
   if (vuoto && ss.getSheets().length > 1 && vuoto.getLastRow() === 0) ss.deleteSheet(vuoto);
